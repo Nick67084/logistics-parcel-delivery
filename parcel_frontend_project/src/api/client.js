@@ -1,10 +1,13 @@
-const BASE_URL = "http://127.0.0.1:8000";
+const BASE_URL = (import.meta.env.VITE_API_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
 
 function getToken() {
   return localStorage.getItem("token");
 }
 
-async function request(path, { method = "GET", body, auth = true, form = false } = {}) {
+async function request(
+  path,
+  { method = "GET", body, auth = true, form = false } = {},
+) {
   const headers = {};
   if (!form) headers["Content-Type"] = "application/json";
   if (auth) {
@@ -27,7 +30,9 @@ async function request(path, { method = "GET", body, auth = true, form = false }
 
   if (!res.ok) {
     const message = data?.detail || res.statusText || "Request failed";
-    throw new Error(typeof message === "string" ? message : JSON.stringify(message));
+    throw new Error(
+      typeof message === "string" ? message : JSON.stringify(message),
+    );
   }
   return data;
 }
@@ -35,13 +40,19 @@ async function request(path, { method = "GET", body, auth = true, form = false }
 export const api = {
   BASE_URL,
 
-  register: (payload) => request("/auth/register", { method: "POST", body: payload, auth: false }),
+  register: (payload) =>
+    request("/auth/register", { method: "POST", body: payload, auth: false }),
 
   login: (email, password) => {
     const form = new URLSearchParams();
     form.append("username", email);
     form.append("password", password);
-    return request("/auth/login", { method: "POST", body: form, auth: false, form: true });
+    return request("/auth/login", {
+      method: "POST",
+      body: form,
+      auth: false,
+      form: true,
+    });
   },
 
   me: () => request("/users/me"),
@@ -49,28 +60,65 @@ export const api = {
   listHubs: () => request("/hubs/", { auth: false }),
   createHub: (payload) => request("/hubs/", { method: "POST", body: payload }),
 
-  bookParcel: (payload) => request("/parcels/", { method: "POST", body: payload }),
+  bookParcel: (payload) =>
+    request("/parcels/", { method: "POST", body: payload }),
   myParcels: () => request("/parcels/"),
   getParcel: (id) => request(`/parcels/${id}`),
-  trackParcel: (trackingNumber) => request(`/parcels/track/${trackingNumber}`, { auth: false }),
-  updateParcelStatus: (id, payload) => request(`/parcels/${id}/status`, { method: "PATCH", body: payload }),
-  hubTransfer: (payload) => request("/parcels/hub-transfer", { method: "POST", body: payload }),
+  trackParcel: (trackingNumber) =>
+    request(`/parcels/track/${trackingNumber}`, { auth: false }),
+  updateParcelStatus: (id, payload) =>
+    request(`/parcels/${id}/status`, { method: "PATCH", body: payload }),
+  cancelParcel: (id, reason) =>
+    request(`/parcels/${id}/cancel`, { method: "POST", body: { reason } }),
+  rescheduleParcel: (id, payload) =>
+    request(`/parcels/${id}/reschedule`, { method: "PATCH", body: payload }),
+  hubTransfer: (payload) =>
+    request("/parcels/hub-transfer", { method: "POST", body: payload }),
 
   courierMe: () => request("/couriers/me"),
-  updateCourierStatus: (status) => request("/couriers/me/status", { method: "POST", body: { status } }),
+
+  courierJobs: () => request("/couriers/jobs"),
+
+  acceptCourierJob: (parcelId) =>
+    request(`/couriers/jobs/${parcelId}/accept`, {
+      method: "POST",
+    }),
+
+  updateCourierStatus: (status) =>
+    request("/couriers/me/status", {
+      method: "POST",
+      body: { status },
+    }),
+
   updateCourierLocation: (latitude, longitude) =>
-    request("/couriers/me/location", { method: "POST", body: { latitude, longitude } }),
+    request("/couriers/me/location", {
+      method: "POST",
+      body: { latitude, longitude },
+    }),
 
   listUsers: () => request("/users/"),
-  createStaff: (payload) => request("/auth/staff", { method: "POST", body: payload }),
-  updateMyAddress: (payload) => request("/users/me/address", { method: "PATCH", body: payload }),
+  createStaff: (payload) =>
+    request("/auth/staff", { method: "POST", body: payload }),
+  updateMyAddress: (payload) =>
+    request("/users/me/address", { method: "PATCH", body: payload }),
 
   geocodeSearch: (query) =>
     request(`/geocode/search?q=${encodeURIComponent(query)}`, { auth: false }),
   geocodeReverse: (lat, lng) =>
     request(`/geocode/reverse?lat=${lat}&lng=${lng}`, { auth: false }),
 };
-
 export function wsUrl(parcelId) {
-  return `${BASE_URL.replace("http", "ws")}/ws/parcels/${parcelId}`;
+  const token = getToken();
+
+  const websocketBase = BASE_URL
+    .replace(/^https:\/\//, "wss://")
+    .replace(/^http:\/\//, "ws://");
+
+  const url = `${websocketBase}/ws/parcels/${parcelId}`;
+
+  if (!token) {
+    return url;
+  }
+
+  return `${url}?token=${encodeURIComponent(token)}`;
 }

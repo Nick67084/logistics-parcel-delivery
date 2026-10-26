@@ -4,11 +4,10 @@ have to manually register accounts every time you restart the database.
 
 Run with:  python seed_data.py
 """
-from app.database import Base, engine, SessionLocal
+from app.database import SessionLocal
 from app import models
 from app.security import hash_password
 
-Base.metadata.create_all(bind=engine)
 db = SessionLocal()
 
 def get_or_create_user(name, email, password, role, phone=None):

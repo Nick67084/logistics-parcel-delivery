@@ -4,26 +4,37 @@ import { useAuth } from "../context/AuthContext";
 
 const ROLE_LINKS = {
   customer: [
-    { to: "/book", label: "Book a Parcel" },
-    { to: "/parcels", label: "My Parcels" },
-    { to: "/track", label: "Track a Parcel" },
-    { to: "/profile", label: "My Profile" },
+    { to: "/customer", label: "Dashboard", icon: "⌂" },
+    { to: "/book", label: "Book a Parcel", icon: "＋" },
+    { to: "/parcels", label: "My Parcels", icon: "▣" },
+    { to: "/track", label: "Track a Parcel", icon: "⌕" },
+    { to: "/profile", label: "My Profile", icon: "◎" },
   ],
+
   courier: [
-    { to: "/courier", label: "Courier Dashboard" },
-    { to: "/track", label: "Track a Parcel" },
-    { to: "/profile", label: "My Profile" },
+    { to: "/courier", label: "Dashboard", icon: "⌂" },
+    { to: "/track", label: "Track a Parcel", icon: "⌕" },
+    { to: "/profile", label: "My Profile", icon: "◎" },
   ],
+
   hub_staff: [
-    { to: "/hub", label: "Hub Operations" },
-    { to: "/track", label: "Track a Parcel" },
-    { to: "/profile", label: "My Profile" },
+    { to: "/hub", label: "Hub Operations", icon: "⌂" },
+    { to: "/track", label: "Track a Parcel", icon: "⌕" },
+    { to: "/profile", label: "My Profile", icon: "◎" },
   ],
+
   admin: [
-    { to: "/admin", label: "Admin Overview" },
-    { to: "/track", label: "Track a Parcel" },
-    { to: "/profile", label: "My Profile" },
+    { to: "/admin", label: "Admin Overview", icon: "⌂" },
+    { to: "/track", label: "Track a Parcel", icon: "⌕" },
+    { to: "/profile", label: "My Profile", icon: "◎" },
   ],
+};
+
+const ROLE_LABELS = {
+  customer: "Customer",
+  courier: "Courier",
+  hub_staff: "Hub Staff",
+  admin: "Administrator",
 };
 
 export default function Layout({ children }) {
@@ -41,9 +52,14 @@ export default function Layout({ children }) {
 
   return (
     <div className="app-shell">
-      {/* Compact top bar — visible only on narrow/mobile screens (see index.css) */}
+
+      {/* Mobile top bar */}
       <div className="mobile-topbar">
-        <span className="mobile-topbar-brand">Parcel Delivery</span>
+        <div className="mobile-brand-wrap">
+          <div className="brand-mark">P</div>
+          <span className="mobile-topbar-brand">Parcel Delivery</span>
+        </div>
+
         <button
           className="hamburger-btn"
           onClick={() => setMenuOpen((open) => !open)}
@@ -53,36 +69,73 @@ export default function Layout({ children }) {
         </button>
       </div>
 
+      {/* Sidebar */}
       <aside className={`sidebar${menuOpen ? " sidebar-open" : ""}`}>
+
+        {/* Brand */}
         <div className="sidebar-brand">
-          Parcel Delivery
-          <small>CSC480 · TEST CONSOLE</small>
+          <div className="brand-row">
+            <div className="brand-mark">P</div>
+
+            <div>
+              <div className="brand-name">Parcel Delivery</div>
+              <small>CSC480 · DELIVERY PLATFORM</small>
+            </div>
+          </div>
         </div>
-        <nav>
+
+        {/* Navigation */}
+        <nav className="sidebar-nav">
+          <div className="nav-section-title">MENU</div>
+
           {links.map((link) => (
             <NavLink
               key={link.to}
               to={link.to}
               onClick={closeMenu}
-              className={({ isActive }) => "nav-link" + (isActive ? " active" : "")}
+              className={({ isActive }) =>
+                "nav-link" + (isActive ? " active" : "")
+              }
             >
-              {link.label}
+              <span className="nav-icon">{link.icon}</span>
+              <span>{link.label}</span>
             </NavLink>
           ))}
         </nav>
+
+        {/* User section */}
         <div className="sidebar-footer">
-          <div className="sidebar-user">
-            <strong>{user?.name}</strong>
-            {user?.email}
-            <div>
-              <span className="role-badge">{user?.role?.replace("_", " ")}</span>
+
+          <div className="sidebar-user-card">
+            <div className="user-avatar">
+              {user?.name?.charAt(0)?.toUpperCase() || "U"}
+            </div>
+
+            <div className="sidebar-user">
+              <strong>{user?.name}</strong>
+              <span>{user?.email}</span>
+
+              <div>
+                <span className="role-badge">
+                  {ROLE_LABELS[user?.role] || user?.role}
+                </span>
+              </div>
             </div>
           </div>
-          <button className="logout-btn" onClick={handleLogout}>Log out</button>
+
+          <button className="logout-btn" onClick={handleLogout}>
+            <span>↪</span>
+            Log out
+          </button>
+
         </div>
       </aside>
 
-      <main className="main-content" onClick={closeMenu}>{children}</main>
+      {/* Main content */}
+      <main className="main-content" onClick={closeMenu}>
+        {children}
+      </main>
+
     </div>
   );
 }

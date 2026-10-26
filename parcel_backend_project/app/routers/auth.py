@@ -1,16 +1,22 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
 from app import crud, models, schemas, security
 from app.database import get_db
 from app.dependencies import require_roles
+from app.limiter import limiter
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/register", response_model=schemas.UserOut, status_code=status.HTTP_201_CREATED)
-def register(user_in: schemas.PublicRegisterRequest, db: Session = Depends(get_db)):
+@limiter.limit("10/hour")
+def register(
+    request: Request,
+    user_in: schemas.PublicRegisterRequest,
+    db: Session = Depends(get_db),
+):
     """Public sign-up. Always creates a customer account — there is no 'role'
     field on this request schema, so it cannot be used to create a courier,
     hub_staff, or admin account no matter what a client sends."""
@@ -19,7 +25,12 @@ def register(user_in: schemas.PublicRegisterRequest, db: Session = Depends(get_d
 
 
 @router.post("/login", response_model=schemas.Token)
-def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def login(
+    request: Request,
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db),
+):
     # OAuth2PasswordRequestForm uses "username" as the field name; we treat it as email.
     user = crud.get_user_by_email(db, form_data.username)
     if not user or not security.verify_password(form_data.password, user.password_hash):

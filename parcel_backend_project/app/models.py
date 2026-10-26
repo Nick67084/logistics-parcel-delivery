@@ -3,7 +3,16 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import (
-    Column, Integer, String, Float, DateTime, ForeignKey, Enum, Text
+    Column,
+    Integer,
+    String,
+    Float,
+    DateTime,
+    ForeignKey,
+    Enum,
+    Text,
+    Boolean,
+    Date,
 )
 from sqlalchemy.orm import relationship
 
@@ -25,24 +34,52 @@ class CourierStatus(str, enum.Enum):
 
 class ParcelStatus(str, enum.Enum):
     created = "created"
+    assigned = "assigned"
     picked_up = "picked_up"
     at_hub = "at_hub"
     in_transit = "in_transit"
     out_for_delivery = "out_for_delivery"
     delivered = "delivered"
     failed = "failed"
+    cancelled = "cancelled"
 
 
-# Allowed forward transitions for the parcel state machine.
+# Allowed transitions for the parcel state machine.
 # Enforced in crud.update_parcel_status so a parcel can't jump illegal states.
 ALLOWED_TRANSITIONS = {
-    ParcelStatus.created: {ParcelStatus.picked_up, ParcelStatus.failed},
-    ParcelStatus.picked_up: {ParcelStatus.at_hub, ParcelStatus.in_transit, ParcelStatus.failed},
-    ParcelStatus.at_hub: {ParcelStatus.in_transit, ParcelStatus.out_for_delivery, ParcelStatus.failed},
-    ParcelStatus.in_transit: {ParcelStatus.at_hub, ParcelStatus.out_for_delivery, ParcelStatus.failed},
-    ParcelStatus.out_for_delivery: {ParcelStatus.delivered, ParcelStatus.failed},
+    ParcelStatus.created: {
+        ParcelStatus.assigned,    # a courier accepts the job
+        ParcelStatus.cancelled,
+    },
+    ParcelStatus.assigned: {
+        ParcelStatus.picked_up,   # courier collected the parcel
+        ParcelStatus.failed,      # pickup failed (sender not there, etc.)
+        ParcelStatus.cancelled,
+    },
+    ParcelStatus.picked_up: {
+        ParcelStatus.at_hub,
+        ParcelStatus.in_transit,
+        ParcelStatus.failed,
+    },
+    ParcelStatus.at_hub: {
+        ParcelStatus.in_transit,
+        ParcelStatus.out_for_delivery,
+        ParcelStatus.failed,
+    },
+    ParcelStatus.in_transit: {
+        ParcelStatus.at_hub,
+        ParcelStatus.out_for_delivery,
+        ParcelStatus.failed,
+    },
+    ParcelStatus.out_for_delivery: {
+        ParcelStatus.delivered,
+        ParcelStatus.failed,
+    },
     ParcelStatus.delivered: set(),
-    ParcelStatus.failed: {ParcelStatus.picked_up},  # allow re-attempt
+    ParcelStatus.failed: {
+        ParcelStatus.picked_up,
+    },  # allow re-attempt
+    ParcelStatus.cancelled: set(),
 }
 
 
@@ -58,17 +95,29 @@ class User(Base):
     email = Column(String(255), unique=True, index=True, nullable=False)
     password_hash = Column(String(255), nullable=False)
     phone = Column(String(30), nullable=True)
-    role = Column(Enum(UserRole), nullable=False, default=UserRole.customer)
+    role = Column(
+        Enum(UserRole),
+        nullable=False,
+        default=UserRole.customer,
+    )
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    # Saved default address (set from the Profile page) — lets a customer
-    # reuse "home" or "work" as pickup without re-entering it every time.
+    # Saved default address
     saved_address = Column(String(255), nullable=True)
     saved_address_lat = Column(Float, nullable=True)
     saved_address_lng = Column(Float, nullable=True)
 
-    courier_profile = relationship("Courier", back_populates="user", uselist=False)
-    sent_parcels = relationship("Parcel", back_populates="sender", foreign_keys="Parcel.sender_id")
+    courier_profile = relationship(
+        "Courier",
+        back_populates="user",
+        uselist=False,
+    )
+
+    sent_parcels = relationship(
+        "Parcel",
+        back_populates="sender",
+        foreign_keys="Parcel.sender_id",
+    )
 
 
 class Hub(Base):
@@ -86,83 +135,359 @@ class Courier(Base):
     __tablename__ = "couriers"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
-    current_hub_id = Column(Integer, ForeignKey("hubs.id"), nullable=True)
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id"),
+        unique=True,
+        nullable=False,
+    )
+    current_hub_id = Column(
+        Integer,
+        ForeignKey("hubs.id"),
+        nullable=True,
+    )
     current_lat = Column(Float, nullable=True)
     current_lng = Column(Float, nullable=True)
-    status = Column(Enum(CourierStatus), default=CourierStatus.offline)
+    status = Column(
+        Enum(CourierStatus),
+        default=CourierStatus.offline,
+    )
 
-    user = relationship("User", back_populates="courier_profile")
+    user = relationship(
+        "User",
+        back_populates="courier_profile",
+    )
+
     current_hub = relationship("Hub")
-    parcels = relationship("Parcel", back_populates="assigned_courier")
+
+    parcels = relationship(
+        "Parcel",
+        back_populates="assigned_courier",
+    )
 
 
 class Parcel(Base):
     __tablename__ = "parcels"
 
-    id = Column(Integer, primary_key=True, index=True)
-    tracking_number = Column(String(30), unique=True, index=True, default=generate_tracking_number)
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True,
+    )
 
-    sender_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    receiver_name = Column(String(120), nullable=False)
-    receiver_phone = Column(String(30), nullable=False)
-    receiver_address = Column(String(255), nullable=False)
+    tracking_number = Column(
+        String(30),
+        unique=True,
+        index=True,
+        default=generate_tracking_number,
+    )
 
-    pickup_address = Column(String(255), nullable=False)
-    pickup_lat = Column(Float, nullable=False)
-    pickup_lng = Column(Float, nullable=False)
-    dropoff_address = Column(String(255), nullable=False)
-    dropoff_lat = Column(Float, nullable=False)
-    dropoff_lng = Column(Float, nullable=False)
+    # Sender
+    sender_id = Column(
+        Integer,
+        ForeignKey("users.id"),
+        nullable=False,
+    )
 
-    current_status = Column(Enum(ParcelStatus), default=ParcelStatus.created, nullable=False)
-    assigned_courier_id = Column(Integer, ForeignKey("couriers.id"), nullable=True)
-    current_hub_id = Column(Integer, ForeignKey("hubs.id"), nullable=True)
+    # Receiver
+    receiver_name = Column(
+        String(120),
+        nullable=False,
+    )
 
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    receiver_phone = Column(
+        String(30),
+        nullable=False,
+    )
 
-    sender = relationship("User", back_populates="sent_parcels", foreign_keys=[sender_id])
-    assigned_courier = relationship("Courier", back_populates="parcels")
+    receiver_address = Column(
+        String(255),
+        nullable=False,
+    )
+
+    # Pickup location
+    pickup_address = Column(
+        String(255),
+        nullable=False,
+    )
+
+    pickup_lat = Column(
+        Float,
+        nullable=False,
+    )
+
+    pickup_lng = Column(
+        Float,
+        nullable=False,
+    )
+
+    # Drop-off location
+    dropoff_address = Column(
+        String(255),
+        nullable=False,
+    )
+
+    dropoff_lat = Column(
+        Float,
+        nullable=False,
+    )
+
+    dropoff_lng = Column(
+        Float,
+        nullable=False,
+    )
+
+    # =========================================================
+    # PACKAGE INFORMATION
+    # =========================================================
+
+    package_type = Column(
+        String(50),
+        nullable=False,
+        default="Box",
+    )
+
+    weight_kg = Column(
+        Float,
+        nullable=False,
+        default=1.0,
+    )
+
+    length_cm = Column(
+        Float,
+        nullable=True,
+    )
+
+    width_cm = Column(
+        Float,
+        nullable=True,
+    )
+
+    height_cm = Column(
+        Float,
+        nullable=True,
+    )
+
+    fragile = Column(
+        Boolean,
+        nullable=False,
+        default=False,
+    )
+
+    # =========================================================
+    # DELIVERY OPTIONS
+    # =========================================================
+
+    service_level = Column(
+        String(30),
+        nullable=False,
+        default="standard",
+    )
+
+    pickup_date = Column(
+        Date,
+        nullable=True,
+    )
+
+    pickup_window = Column(
+        String(50),
+        nullable=True,
+    )
+
+    delivery_instructions = Column(
+        Text,
+        nullable=True,
+    )
+
+    # =========================================================
+    # PRICING
+    # =========================================================
+
+    estimated_fee = Column(
+        Float,
+        nullable=True,
+    )
+
+    # =========================================================
+    # PARCEL STATUS
+    # =========================================================
+
+    current_status = Column(
+        Enum(ParcelStatus),
+        default=ParcelStatus.created,
+        nullable=False,
+    )
+
+    assigned_courier_id = Column(
+        Integer,
+        ForeignKey("couriers.id"),
+        nullable=True,
+    )
+
+    current_hub_id = Column(
+        Integer,
+        ForeignKey("hubs.id"),
+        nullable=True,
+    )
+
+    created_at = Column(
+        DateTime,
+        default=datetime.utcnow,
+    )
+
+    updated_at = Column(
+        DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+    )
+
+    # =========================================================
+    # RELATIONSHIPS
+    # =========================================================
+
+    sender = relationship(
+        "User",
+        back_populates="sent_parcels",
+        foreign_keys=[sender_id],
+    )
+
+    assigned_courier = relationship(
+        "Courier",
+        back_populates="parcels",
+    )
+
     current_hub = relationship("Hub")
+
     status_history = relationship(
-        "ParcelStatusHistory", back_populates="parcel",
-        order_by="ParcelStatusHistory.timestamp", cascade="all, delete-orphan"
+        "ParcelStatusHistory",
+        back_populates="parcel",
+        order_by="ParcelStatusHistory.timestamp",
+        cascade="all, delete-orphan",
     )
 
 
 class ParcelStatusHistory(Base):
     __tablename__ = "parcel_status_history"
 
-    id = Column(Integer, primary_key=True, index=True)
-    parcel_id = Column(Integer, ForeignKey("parcels.id"), nullable=False)
-    status = Column(Enum(ParcelStatus), nullable=False)
-    changed_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    location_lat = Column(Float, nullable=True)
-    location_lng = Column(Float, nullable=True)
-    note = Column(Text, nullable=True)
-    timestamp = Column(DateTime, default=datetime.utcnow)
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True,
+    )
 
-    parcel = relationship("Parcel", back_populates="status_history")
+    parcel_id = Column(
+        Integer,
+        ForeignKey("parcels.id"),
+        nullable=False,
+    )
+
+    status = Column(
+        Enum(ParcelStatus),
+        nullable=False,
+    )
+
+    changed_by_user_id = Column(
+        Integer,
+        ForeignKey("users.id"),
+        nullable=True,
+    )
+
+    location_lat = Column(
+        Float,
+        nullable=True,
+    )
+
+    location_lng = Column(
+        Float,
+        nullable=True,
+    )
+
+    note = Column(
+        Text,
+        nullable=True,
+    )
+
+    timestamp = Column(
+        DateTime,
+        default=datetime.utcnow,
+    )
+
+    parcel = relationship(
+        "Parcel",
+        back_populates="status_history",
+    )
 
 
 class HubTransfer(Base):
     __tablename__ = "hub_transfers"
 
-    id = Column(Integer, primary_key=True, index=True)
-    parcel_id = Column(Integer, ForeignKey("parcels.id"), nullable=False)
-    from_hub_id = Column(Integer, ForeignKey("hubs.id"), nullable=True)
-    to_hub_id = Column(Integer, ForeignKey("hubs.id"), nullable=False)
-    transferred_at = Column(DateTime, default=datetime.utcnow)
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True,
+    )
+
+    parcel_id = Column(
+        Integer,
+        ForeignKey("parcels.id"),
+        nullable=False,
+    )
+
+    from_hub_id = Column(
+        Integer,
+        ForeignKey("hubs.id"),
+        nullable=True,
+    )
+
+    to_hub_id = Column(
+        Integer,
+        ForeignKey("hubs.id"),
+        nullable=False,
+    )
+
+    transferred_at = Column(
+        DateTime,
+        default=datetime.utcnow,
+    )
 
 
 class Notification(Base):
     __tablename__ = "notifications"
 
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    parcel_id = Column(Integer, ForeignKey("parcels.id"), nullable=True)
-    type = Column(String(50), nullable=False)
-    message = Column(String(255), nullable=False)
-    sent_at = Column(DateTime, default=datetime.utcnow)
-    read_at = Column(DateTime, nullable=True)
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True,
+    )
+
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id"),
+        nullable=False,
+    )
+
+    parcel_id = Column(
+        Integer,
+        ForeignKey("parcels.id"),
+        nullable=True,
+    )
+
+    type = Column(
+        String(50),
+        nullable=False,
+    )
+
+    message = Column(
+        String(255),
+        nullable=False,
+    )
+
+    sent_at = Column(
+        DateTime,
+        default=datetime.utcnow,
+    )
+
+    read_at = Column(
+        DateTime,
+        nullable=True,
+    )

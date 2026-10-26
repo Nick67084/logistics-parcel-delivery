@@ -19,7 +19,12 @@ async def search_address(q: str = Query(..., min_length=3)):
         try:
             resp = await client.get(
                 f"{NOMINATIM_BASE}/search",
-                params={"q": q, "format": "json", "limit": 5},
+                params={
+                    "q": q,
+                    "format": "json",
+                    "limit": 5,
+                    "accept-language": "en",
+                },
                 headers=HEADERS,
             )
             resp.raise_for_status()
@@ -46,7 +51,12 @@ async def reverse_geocode(lat: float, lng: float):
         try:
             resp = await client.get(
                 f"{NOMINATIM_BASE}/reverse",
-                params={"lat": lat, "lon": lng, "format": "json"},
+                params={
+                    "lat": lat,
+                    "lon": lng,
+                    "format": "json",
+                    "accept-language": "en",
+                },
                 headers=HEADERS,
             )
             resp.raise_for_status()

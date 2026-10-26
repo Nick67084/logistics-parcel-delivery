@@ -1,9 +1,22 @@
-from datetime import datetime
+import re
+from datetime import datetime, date
 from typing import Optional, List
 
-from pydantic import BaseModel, EmailStr, ConfigDict
+from pydantic import BaseModel, EmailStr, ConfigDict, field_validator
 
 from app.models import UserRole, CourierStatus, ParcelStatus
+
+
+# ---------- Password rules ----------
+
+def check_password_strength(value: str) -> str:
+    if len(value) < 8:
+        raise ValueError("Password must be at least 8 characters")
+    if len(value.encode("utf-8")) > 72:  # bcrypt limit
+        raise ValueError("Password must be 72 bytes or fewer")
+    if not re.search(r"[A-Za-z]", value) or not re.search(r"\d", value):
+        raise ValueError("Password must contain at least one letter and one number")
+    return value
 
 
 # ---------- Auth / Users ----------
@@ -16,15 +29,23 @@ class UserCreate(BaseModel):
     phone: Optional[str] = None
     role: UserRole = UserRole.customer
 
+    @field_validator("password")
+    @classmethod
+    def password_strength(cls, v: str) -> str:
+        return check_password_strength(v)
+
 
 class PublicRegisterRequest(BaseModel):
-    """What the public /auth/register endpoint accepts. No 'role' field exists here
-    at all, so a customer account is the only thing a public sign-up can ever create —
-    this can't be bypassed by sending extra fields, unlike just defaulting a value."""
+    """Public registration — only customer accounts can be created."""
     name: str
     email: EmailStr
     password: str
     phone: Optional[str] = None
+
+    @field_validator("password")
+    @classmethod
+    def password_strength(cls, v: str) -> str:
+        return check_password_strength(v)
 
 
 class StaffCreateRequest(BaseModel):
@@ -34,6 +55,11 @@ class StaffCreateRequest(BaseModel):
     password: str
     phone: Optional[str] = None
     role: UserRole
+
+    @field_validator("password")
+    @classmethod
+    def password_strength(cls, v: str) -> str:
+        return check_password_strength(v)
 
 
 class UserOut(BaseModel):
@@ -110,15 +136,34 @@ class CourierOut(BaseModel):
 # ---------- Parcels ----------
 
 class ParcelCreate(BaseModel):
+    # Receiver information
     receiver_name: str
     receiver_phone: str
     receiver_address: str
+
+    # Pickup location
     pickup_address: str
     pickup_lat: float
     pickup_lng: float
+
+    # Drop-off location
     dropoff_address: str
     dropoff_lat: float
     dropoff_lng: float
+
+    # Package information
+    package_type: str = "Box"
+    weight_kg: float = 1.0
+    length_cm: Optional[float] = None
+    width_cm: Optional[float] = None
+    height_cm: Optional[float] = None
+    fragile: bool = False
+
+    # Delivery options
+    service_level: str = "standard"
+    pickup_date: Optional[date] = None
+    pickup_window: Optional[str] = None
+    delivery_instructions: Optional[str] = None
 
 
 class ParcelStatusUpdate(BaseModel):
@@ -145,18 +190,42 @@ class ParcelOut(BaseModel):
     id: int
     tracking_number: str
     sender_id: int
+
+    # Receiver
     receiver_name: str
     receiver_phone: str
     receiver_address: str
+
+    # Pickup / Drop-off
     pickup_address: str
     pickup_lat: float
     pickup_lng: float
     dropoff_address: str
     dropoff_lat: float
     dropoff_lng: float
+
+    # Package information
+    package_type: str
+    weight_kg: float
+    length_cm: Optional[float] = None
+    width_cm: Optional[float] = None
+    height_cm: Optional[float] = None
+    fragile: bool
+
+    # Delivery options
+    service_level: str
+    pickup_date: Optional[date] = None
+    pickup_window: Optional[str] = None
+    delivery_instructions: Optional[str] = None
+
+    # Pricing
+    estimated_fee: Optional[float] = None
+
+    # Status / assignment
     current_status: ParcelStatus
     assigned_courier_id: Optional[int] = None
     current_hub_id: Optional[int] = None
+
     created_at: datetime
     updated_at: datetime
 
@@ -168,3 +237,40 @@ class ParcelDetailOut(ParcelOut):
 class HubTransferCreate(BaseModel):
     parcel_id: int
     to_hub_id: int
+
+
+# ---------- Public tracking (no login) ----------
+
+class PublicTrackingEvent(BaseModel):
+    status: ParcelStatus
+    timestamp: datetime
+
+
+class PublicTrackingOut(BaseModel):
+    """Only what a stranger with a tracking number is allowed to see.
+    No phone, no addresses, no coordinates, no user ids, no staff notes."""
+    tracking_number: str
+    current_status: ParcelStatus
+    service_level: str
+    receiver_name_masked: str
+    created_at: datetime
+    updated_at: datetime
+    status_history: List[PublicTrackingEvent] = []
+
+
+# ---------- Cancel / reschedule ----------
+
+class ParcelCancelRequest(BaseModel):
+    reason: Optional[str] = None
+
+
+class ParcelRescheduleRequest(BaseModel):
+    pickup_date: date
+    pickup_window: Optional[str] = None
+
+    @field_validator("pickup_date")
+    @classmethod
+    def pickup_not_in_past(cls, v: date) -> date:
+        if v < date.today():
+            raise ValueError("Pickup date cannot be in the past")
+        return v

@@ -9,9 +9,10 @@ import CourierDashboardPage from "./pages/CourierDashboardPage";
 import HubStaffPage from "./pages/HubStaffPage";
 import AdminPage from "./pages/AdminPage";
 import ProfilePage from "./pages/ProfilePage";
+import CustomerDashboardPage from "./pages/CustomerDashboardPage";
 
 const HOME_BY_ROLE = {
-  customer: "/book",
+    customer: "/customer",
   courier: "/courier",
   hub_staff: "/hub",
   admin: "/admin",
@@ -33,14 +34,18 @@ function HomeRedirect() {
 
 function AppRoutes() {
   return (
-    <Routes>
+       <Routes>
       <Route path="/login" element={<AuthPage />} />
       <Route path="/" element={<HomeRedirect />} />
 
+      {/* Public: anyone can track a parcel without logging in */}
+      <Route path="/track" element={<TrackPage />} />
+      <Route path="/track/:trackingNumber" element={<TrackPage />} />
+
+      <Route path="/customer" element={<PrivateRoute><CustomerDashboardPage /></PrivateRoute>} />
       <Route path="/book" element={<PrivateRoute><BookParcelPage /></PrivateRoute>} />
       <Route path="/parcels" element={<PrivateRoute><MyParcelsPage /></PrivateRoute>} />
       <Route path="/parcels/:id" element={<PrivateRoute><ParcelDetailPage /></PrivateRoute>} />
-      <Route path="/track" element={<PrivateRoute><TrackPage /></PrivateRoute>} />
       <Route path="/courier" element={<PrivateRoute><CourierDashboardPage /></PrivateRoute>} />
       <Route path="/hub" element={<PrivateRoute><HubStaffPage /></PrivateRoute>} />
       <Route path="/admin" element={<PrivateRoute><AdminPage /></PrivateRoute>} />
