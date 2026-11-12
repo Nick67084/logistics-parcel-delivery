@@ -4,7 +4,14 @@ from typing import Optional, List
 
 from pydantic import BaseModel, EmailStr, ConfigDict, field_validator
 
-from app.models import UserRole, CourierStatus, ParcelStatus
+from app.models import (
+    UserRole,
+    CourierStatus,
+    ParcelStatus,
+    BookingStatus,
+    PaymentMethod,
+    PaymentStatus,
+)
 
 
 # ---------- Password rules ----------
@@ -221,6 +228,9 @@ class ParcelOut(BaseModel):
     # Pricing
     estimated_fee: Optional[float] = None
 
+    # Booking/payment confirmation
+    booking_status: BookingStatus
+
     # Status / assignment
     current_status: ParcelStatus
     assigned_courier_id: Optional[int] = None
@@ -274,3 +284,24 @@ class ParcelRescheduleRequest(BaseModel):
         if v < date.today():
             raise ValueError("Pickup date cannot be in the past")
         return v
+
+# ---------- Payments ----------
+
+class PaymentCreate(BaseModel):
+    payment_method: PaymentMethod
+
+
+class PaymentOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    parcel_id: int
+    user_id: int
+    amount: float
+    payment_method: PaymentMethod
+    payment_status: PaymentStatus
+    transaction_reference: Optional[str] = None
+    expires_at: Optional[datetime] = None
+    paid_at: Optional[datetime] = None
+    collected_by_user_id: Optional[int] = None
+    created_at: datetime

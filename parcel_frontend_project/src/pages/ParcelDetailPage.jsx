@@ -285,6 +285,7 @@ export default function ParcelDetailPage() {
   const { id } = useParams();
 
   const [parcel, setParcel] = useState(null);
+  const [payment, setPayment] = useState(null);
   const [error, setError] = useState("");
   const [connected, setConnected] = useState(false);
   const [connectionState, setConnectionState] = useState("connecting");
@@ -330,9 +331,16 @@ export default function ParcelDetailPage() {
   const load = useCallback(() => {
     api
       .getParcel(id)
-      .then((data) => {
+      .then(async (data) => {
         setParcel(data);
         setLastUpdated(new Date());
+
+        try {
+          const paymentData = await api.getPayment(id);
+          setPayment(paymentData);
+        } catch (_) {
+          setPayment(null);
+        }
       })
       .catch((e) => setError(e.message));
   }, [id]);
@@ -1591,7 +1599,7 @@ export default function ParcelDetailPage() {
             </span>
 
             <h3>
-              Estimated Delivery Fee
+              Delivery Payment
             </h3>
 
             <div className="tracking-price">
@@ -1601,16 +1609,71 @@ export default function ParcelDetailPage() {
               </span>
 
               <strong>
-
                 {parcel.estimated_fee != null
-                  ? Number(
-                      parcel.estimated_fee
-                    ).toFixed(2)
+                  ? Number(parcel.estimated_fee).toFixed(2)
                   : "—"}
-
               </strong>
 
             </div>
+
+            {payment ? (
+              <>
+                <p className="tracking-instructions">
+                  Method: {
+                    payment.payment_method === "cash_on_delivery"
+                      ? "Cash on Delivery"
+                      : payment.payment_method === "promptpay"
+                        ? "PromptPay / QR"
+                        : "Credit / Debit Card"
+                  }
+                  <br />
+                  Status: <strong>{payment.payment_status.toUpperCase()}</strong>
+                </p>
+
+                {payment.payment_status === "paid" && (
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    onClick={() => window.location.assign(`/payments/${parcel.id}`)}
+                  >
+                    View Final Receipt
+                  </button>
+                )}
+
+                {payment.payment_status === "unpaid" && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => window.location.assign(`/payments/${parcel.id}`)}
+                  >
+                    View Unpaid Voucher
+                  </button>
+                )}
+
+                {payment.payment_status === "pending" && (
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    onClick={() => window.location.assign(`/payments/${parcel.id}`)}
+                  >
+                    Make Payment
+                  </button>
+                )}
+              </>
+            ) : (
+              <p className="tracking-instructions">
+                Payment method has not been selected yet.
+                <br />
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={() => window.location.assign(`/payments/${parcel.id}`)}
+                  style={{ marginTop: "12px" }}
+                >
+                  Choose Payment Method
+                </button>
+              </p>
+            )}
 
           </div>
 

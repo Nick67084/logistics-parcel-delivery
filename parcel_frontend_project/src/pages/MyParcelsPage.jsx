@@ -419,12 +419,23 @@ export default function MyParcelsPage() {
                         View Details
                       </button>
 
-                      <button
-                        className="btn btn-sm btn-primary"
-                        onClick={() => navigate(`/parcels/${parcel.id}`)}
-                      >
-                        Track Parcel
-                      </button>
+                      {parcel.booking_status === "pending_payment" && (
+                        <button
+                          className="btn btn-sm btn-primary"
+                          onClick={() => navigate(`/payments/${parcel.id}`)}
+                        >
+                          Choose Payment
+                        </button>
+                      )}
+
+                      {parcel.booking_status !== "pending_payment" && (
+                        <button
+                          className="btn btn-sm btn-primary"
+                          onClick={() => navigate(`/parcels/${parcel.id}`)}
+                        >
+                          Track Parcel
+                        </button>
+                      )}
                     </div>
                   </div>
                 </article>

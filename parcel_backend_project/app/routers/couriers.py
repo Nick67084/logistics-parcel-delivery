@@ -53,11 +53,19 @@ def get_available_jobs(
         .filter(
             models.Parcel.current_status == models.ParcelStatus.created,
             models.Parcel.assigned_courier_id.is_(None),
+            models.Parcel.booking_status == models.BookingStatus.confirmed,
         )
         .all()
     )
 
-    return jobs
+    for parcel in jobs:
+        crud.expire_payment_if_needed(db, parcel)
+
+    return [
+        parcel
+        for parcel in jobs
+        if parcel.booking_status == models.BookingStatus.confirmed
+    ]
 
 
 @router.post("/jobs/{parcel_id}/accept", response_model=schemas.ParcelOut)

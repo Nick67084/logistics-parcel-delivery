@@ -279,8 +279,7 @@ export default function BookParcelPage() {
           deliveryInstructions.trim() || null,
       });
 
-      setSuccess(parcel);
-      resetForm();
+      navigate(`/payments/${parcel.id}`);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -1252,8 +1251,8 @@ export default function BookParcelPage() {
                   </strong>
 
                   <p>
-                    Your parcel will enter the delivery network
-                    after booking.
+                    After confirming, you will choose a payment method.
+                    Online payments must be completed within one hour.
                   </p>
                 </div>
 

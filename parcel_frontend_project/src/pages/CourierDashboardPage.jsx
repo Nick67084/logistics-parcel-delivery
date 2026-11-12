@@ -329,6 +329,24 @@ export default function CourierDashboardPage() {
     setUpdatingParcel(parcelId);
 
     try {
+      if (status === "delivered") {
+        let payment = null;
+
+        try {
+          payment = await api.getPayment(parcelId);
+        } catch (_) {
+          payment = null;
+        }
+
+        if (
+          payment?.payment_method === "cash_on_delivery" &&
+          payment?.payment_status === "unpaid"
+        ) {
+          await api.collectCashPayment(parcelId);
+          setMessage("Cash on delivery collected successfully.");
+        }
+      }
+
       await api.updateParcelStatus(parcelId, {
         status,
       });
@@ -339,7 +357,7 @@ export default function CourierDashboardPage() {
         );
       } else if (status === "delivered") {
         setMessage(
-          "Parcel delivered. Live GPS sharing will stop automatically."
+          "Parcel delivered. Any required COD cash was recorded, and live GPS sharing will stop automatically."
         );
       } else {
         setMessage(

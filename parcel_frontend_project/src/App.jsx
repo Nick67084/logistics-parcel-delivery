@@ -10,6 +10,7 @@ import HubStaffPage from "./pages/HubStaffPage";
 import AdminPage from "./pages/AdminPage";
 import ProfilePage from "./pages/ProfilePage";
 import CustomerDashboardPage from "./pages/CustomerDashboardPage";
+import PaymentPage from "./pages/PaymentPage";
 
 const HOME_BY_ROLE = {
     customer: "/customer",
@@ -44,6 +45,7 @@ function AppRoutes() {
 
       <Route path="/customer" element={<PrivateRoute><CustomerDashboardPage /></PrivateRoute>} />
       <Route path="/book" element={<PrivateRoute><BookParcelPage /></PrivateRoute>} />
+      <Route path="/payments/:parcelId" element={<PrivateRoute><PaymentPage /></PrivateRoute>} />
       <Route path="/parcels" element={<PrivateRoute><MyParcelsPage /></PrivateRoute>} />
       <Route path="/parcels/:id" element={<PrivateRoute><ParcelDetailPage /></PrivateRoute>} />
       <Route path="/courier" element={<PrivateRoute><CourierDashboardPage /></PrivateRoute>} />

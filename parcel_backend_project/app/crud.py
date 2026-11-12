@@ -1,5 +1,7 @@
 import math
 from typing import Optional
+from datetime import datetime, timedelta
+import uuid
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
@@ -241,6 +243,7 @@ def create_parcel(
     """
     parcel_data = parcel_in.model_dump()
     parcel_data["estimated_fee"] = calculate_estimated_fee(parcel_in)
+    parcel_data["booking_status"] = models.BookingStatus.pending_payment
 
     parcel = models.Parcel(
         sender_id=sender.id,
@@ -255,24 +258,13 @@ def create_parcel(
         db,
         parcel,
         models.ParcelStatus.created,
-        changed_by_user_id=sender.id
+        changed_by_user_id=sender.id,
+        note="Booking created and waiting for payment method",
     )
 
-    courier = find_nearest_available_courier(
-        db,
-        parcel.pickup_lat,
-        parcel.pickup_lng,
-    )
-
-    if courier is not None:
-        parcel = assign_parcel_to_courier(
-            db,
-            parcel.id,
-            courier,
-            user=None,
-            note="Automatically assigned to the nearest available courier",
-        )
-
+    # Do not assign a courier until the booking is confirmed.
+    # Online payment confirms the booking after payment succeeds;
+    # COD confirms it immediately and is paid when the courier collects cash.
     return parcel
 
 
@@ -408,6 +400,20 @@ def update_parcel_status(
             ),
         )
 
+    # COD must be collected by the assigned courier before the parcel can
+    # be marked delivered. Online payments are already paid before pickup.
+    if new_status == models.ParcelStatus.delivered:
+        payment = parcel.payment
+        if (
+            payment
+            and payment.payment_method == models.PaymentMethod.cash_on_delivery
+            and payment.payment_status != models.PaymentStatus.paid
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Cash on delivery must be collected before marking the parcel delivered",
+            )
+
     parcel.current_status = new_status
 
     db.commit()
@@ -525,6 +531,228 @@ def transfer_parcel_to_hub(
     db.refresh(parcel)
 
     return transfer
+
+
+# ---------- Payments ----------
+
+def _payment_deadline(parcel: models.Parcel) -> datetime:
+    return parcel.created_at + timedelta(hours=1)
+
+
+def _make_transaction_reference(prefix: str = "SD") -> str:
+    return f"{prefix}-{uuid.uuid4().hex[:12].upper()}"
+
+
+def expire_payment_if_needed(db: Session, parcel: models.Parcel) -> Optional[models.Payment]:
+    payment = parcel.payment
+
+    if not payment:
+        return None
+
+    if (
+        payment.payment_method in (
+            models.PaymentMethod.promptpay,
+            models.PaymentMethod.card,
+        )
+        and payment.payment_status == models.PaymentStatus.pending
+        and payment.expires_at is not None
+        and datetime.utcnow() >= payment.expires_at
+    ):
+        payment.payment_status = models.PaymentStatus.expired
+        parcel.booking_status = models.BookingStatus.expired
+        payment.expires_at = payment.expires_at
+        db.commit()
+        db.refresh(payment)
+        db.refresh(parcel)
+
+    return payment
+
+
+def _confirm_booking_and_assign_courier(
+    db: Session,
+    parcel: models.Parcel,
+    note: str,
+) -> models.Parcel:
+    if parcel.booking_status == models.BookingStatus.expired:
+        raise HTTPException(status_code=409, detail="This booking has expired")
+
+    parcel.booking_status = models.BookingStatus.confirmed
+    db.commit()
+    db.refresh(parcel)
+
+    if parcel.current_status == models.ParcelStatus.created and parcel.assigned_courier_id is None:
+        courier = find_nearest_available_courier(
+            db,
+            parcel.pickup_lat,
+            parcel.pickup_lng,
+        )
+
+        if courier is not None:
+            parcel = assign_parcel_to_courier(
+                db,
+                parcel.id,
+                courier,
+                user=None,
+                note=note,
+            )
+
+    return parcel
+
+
+def start_payment(
+    db: Session,
+    parcel: models.Parcel,
+    user: models.User,
+    method: models.PaymentMethod,
+) -> models.Payment:
+    if parcel.sender_id != user.id:
+        raise HTTPException(status_code=403, detail="You do not own this parcel")
+
+    if parcel.booking_status == models.BookingStatus.expired:
+        raise HTTPException(status_code=409, detail="This booking has expired")
+
+    existing = parcel.payment
+    if existing:
+        expire_payment_if_needed(db, parcel)
+        existing = parcel.payment
+
+        if existing.payment_status == models.PaymentStatus.paid:
+            return existing
+
+        if existing.payment_status == models.PaymentStatus.unpaid:
+            if method == models.PaymentMethod.cash_on_delivery:
+                return existing
+            raise HTTPException(
+                status_code=409,
+                detail="This booking is already configured for cash on delivery",
+            )
+
+        if existing.payment_status == models.PaymentStatus.pending:
+            if existing.payment_method != method:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Payment method is already set to {existing.payment_method.value}",
+                )
+            return existing
+
+        if existing.payment_status == models.PaymentStatus.expired:
+            raise HTTPException(status_code=409, detail="Online payment time has expired")
+
+    if method == models.PaymentMethod.cash_on_delivery:
+        payment = models.Payment(
+            parcel_id=parcel.id,
+            user_id=user.id,
+            amount=parcel.estimated_fee or 0.0,
+            payment_method=method,
+            payment_status=models.PaymentStatus.unpaid,
+            expires_at=None,
+        )
+        db.add(payment)
+        db.commit()
+        db.refresh(payment)
+
+        _confirm_booking_and_assign_courier(
+            db,
+            parcel,
+            "Booking confirmed with cash on delivery",
+        )
+        return payment
+
+    expires_at = _payment_deadline(parcel)
+    if datetime.utcnow() >= expires_at:
+        parcel.booking_status = models.BookingStatus.expired
+        db.commit()
+        raise HTTPException(status_code=409, detail="The 1-hour online payment window has expired")
+
+    payment = models.Payment(
+        parcel_id=parcel.id,
+        user_id=user.id,
+        amount=parcel.estimated_fee or 0.0,
+        payment_method=method,
+        payment_status=models.PaymentStatus.pending,
+        expires_at=expires_at,
+    )
+    db.add(payment)
+    db.commit()
+    db.refresh(payment)
+    return payment
+
+
+def complete_online_payment(
+    db: Session,
+    parcel: models.Parcel,
+    user: models.User,
+) -> models.Payment:
+    if parcel.sender_id != user.id:
+        raise HTTPException(status_code=403, detail="You do not own this parcel")
+
+    payment = parcel.payment
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment has not been started")
+
+    expire_payment_if_needed(db, parcel)
+    payment = parcel.payment
+
+    if payment.payment_method not in (models.PaymentMethod.promptpay, models.PaymentMethod.card):
+        raise HTTPException(status_code=400, detail="This payment is not an online payment")
+
+    if payment.payment_status == models.PaymentStatus.expired:
+        raise HTTPException(status_code=409, detail="The 1-hour online payment window has expired")
+
+    if payment.payment_status == models.PaymentStatus.paid:
+        return payment
+
+    if payment.payment_status != models.PaymentStatus.pending:
+        raise HTTPException(status_code=409, detail="Payment cannot be completed")
+
+    payment.payment_status = models.PaymentStatus.paid
+    payment.paid_at = datetime.utcnow()
+    payment.expires_at = None
+    payment.transaction_reference = _make_transaction_reference(
+        "QR" if payment.payment_method == models.PaymentMethod.promptpay else "CARD"
+    )
+    db.commit()
+    db.refresh(payment)
+
+    _confirm_booking_and_assign_courier(
+        db,
+        parcel,
+        "Online payment completed; booking confirmed",
+    )
+
+    return payment
+
+
+def collect_cash_payment(
+    db: Session,
+    parcel: models.Parcel,
+    courier_user: models.User,
+) -> models.Payment:
+    if courier_user.role != models.UserRole.courier:
+        raise HTTPException(status_code=403, detail="Only a courier can collect COD payment")
+
+    courier = courier_user.courier_profile
+    if not courier or parcel.assigned_courier_id != courier.id:
+        raise HTTPException(status_code=403, detail="This parcel is not assigned to you")
+
+    payment = parcel.payment
+    if not payment or payment.payment_method != models.PaymentMethod.cash_on_delivery:
+        raise HTTPException(status_code=400, detail="This parcel is not a cash-on-delivery shipment")
+
+    if payment.payment_status == models.PaymentStatus.paid:
+        return payment
+
+    if payment.payment_status != models.PaymentStatus.unpaid:
+        raise HTTPException(status_code=409, detail="COD payment is not awaiting cash collection")
+
+    payment.payment_status = models.PaymentStatus.paid
+    payment.paid_at = datetime.utcnow()
+    payment.collected_by_user_id = courier_user.id
+    payment.transaction_reference = _make_transaction_reference("COD")
+
+    db.commit()
+    db.refresh(payment)
+    return payment
 
 
 # ---------- Public tracking helpers ----------

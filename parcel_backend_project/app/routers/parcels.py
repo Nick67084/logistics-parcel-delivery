@@ -68,10 +68,15 @@ def list_my_parcels(
     Return parcels available to the current user.
     """
 
-    return crud.list_parcels_for_user(
+    parcels = crud.list_parcels_for_user(
         db,
         current_user
     )
+
+    for parcel in parcels:
+        crud.expire_payment_if_needed(db, parcel)
+
+    return parcels
 
 
 # ---------- Public Tracking ----------
@@ -132,6 +137,8 @@ def get_parcel(
         db,
         parcel_id
     )
+
+    crud.expire_payment_if_needed(db, parcel)
 
     # Customers can only access parcels they created.
     if current_user.role == models.UserRole.customer:

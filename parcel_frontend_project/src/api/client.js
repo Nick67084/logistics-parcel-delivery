@@ -75,6 +75,25 @@ export const api = {
   hubTransfer: (payload) =>
     request("/parcels/hub-transfer", { method: "POST", body: payload }),
 
+  getPayment: (parcelId) =>
+    request(`/payments/${parcelId}`),
+
+  startPayment: (parcelId, paymentMethod) =>
+    request(`/payments/${parcelId}/start`, {
+      method: "POST",
+      body: { payment_method: paymentMethod },
+    }),
+
+  completeOnlinePayment: (parcelId) =>
+    request(`/payments/${parcelId}/complete`, {
+      method: "POST",
+    }),
+
+  collectCashPayment: (parcelId) =>
+    request(`/payments/${parcelId}/collect-cash`, {
+      method: "POST",
+    }),
+
   courierMe: () => request("/couriers/me"),
 
   courierJobs: () => request("/couriers/jobs"),
