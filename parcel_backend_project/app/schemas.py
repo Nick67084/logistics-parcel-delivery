@@ -298,6 +298,8 @@ class PaymentOut(BaseModel):
     parcel_id: int
     user_id: int
     amount: float
+    amount_minor: Optional[int] = None
+    currency: str = "THB"
     payment_method: PaymentMethod
     payment_status: PaymentStatus
     transaction_reference: Optional[str] = None

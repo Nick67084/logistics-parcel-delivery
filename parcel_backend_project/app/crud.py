@@ -1,6 +1,7 @@
 import math
 from typing import Optional
 from datetime import datetime, timedelta
+from decimal import Decimal, ROUND_HALF_UP
 import uuid
 
 from fastapi import HTTPException, status
@@ -535,6 +536,14 @@ def transfer_parcel_to_hub(
 
 # ---------- Payments ----------
 
+def _payment_amount_minor(amount: float) -> int:
+    """Convert the stored delivery fee to integer satang without recalculating it."""
+    value = Decimal(str(amount))
+    if not value.is_finite() or value < 0:
+        raise HTTPException(status_code=400, detail="Invalid payment amount")
+    return int((value * 100).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+
+
 def _payment_deadline(parcel: models.Parcel) -> datetime:
     return parcel.created_at + timedelta(hours=1)
 
@@ -643,6 +652,8 @@ def start_payment(
             parcel_id=parcel.id,
             user_id=user.id,
             amount=parcel.estimated_fee or 0.0,
+            amount_minor=_payment_amount_minor(parcel.estimated_fee or 0.0),
+            currency="THB",
             payment_method=method,
             payment_status=models.PaymentStatus.unpaid,
             expires_at=None,
@@ -668,6 +679,8 @@ def start_payment(
         parcel_id=parcel.id,
         user_id=user.id,
         amount=parcel.estimated_fee or 0.0,
+        amount_minor=_payment_amount_minor(parcel.estimated_fee or 0.0),
+        currency="THB",
         payment_method=method,
         payment_status=models.PaymentStatus.pending,
         expires_at=expires_at,

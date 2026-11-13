@@ -639,6 +639,20 @@ class Payment(Base):
         nullable=False,
     )
 
+    # Exact payment amount in satang (100 satang = 1 THB).
+    # Nullable during the compatibility migration; backfill before enforcing.
+    amount_minor = Column(
+        Integer,
+        nullable=True,
+    )
+
+    currency = Column(
+        String(3),
+        nullable=False,
+        default="THB",
+        server_default="THB",
+    )
+
     payment_method = Column(
         Enum(PaymentMethod),
         nullable=False,
