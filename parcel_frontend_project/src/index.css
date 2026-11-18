@@ -7817,8 +7817,9 @@ textarea {
 .admin-stat-card {
   position: relative;
   overflow: hidden;
+  min-width: 0;
   min-height: 125px;
-  padding: 20px;
+  padding: 18px 14px;
   border: 1px solid #e4e7ec;
   border-radius: 14px;
   background: #ffffff;
@@ -7834,9 +7835,11 @@ textarea {
 
 .admin-stat-value {
   color: #101828;
-  font-size: 30px;
-  line-height: 1;
+  font-size: clamp(18px, 1.7vw, 26px);
+  line-height: 1.2;
   font-weight: 800;
+  letter-spacing: -0.5px;
+  overflow-wrap: anywhere;
 }
 
 .admin-stat-description {

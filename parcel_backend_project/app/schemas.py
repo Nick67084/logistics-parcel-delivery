@@ -307,3 +307,62 @@ class PaymentOut(BaseModel):
     paid_at: Optional[datetime] = None
     collected_by_user_id: Optional[int] = None
     created_at: datetime
+
+
+class CourierTodayCollectionOut(BaseModel):
+    date: date
+    timezone: str
+    total_amount_minor: int
+    total_amount: float
+    currency: str = "THB"
+    collection_count: int
+
+
+# ---------- Admin Payment Management ----------
+
+class AdminPaymentSummaryOut(BaseModel):
+    date: date
+    timezone: str = "Asia/Bangkok"
+    currency: str = "THB"
+
+    cod_collected_minor: int
+    cod_collected_amount: float
+    cod_collection_count: int
+
+    unpaid_cod_count: int
+
+    online_paid_minor: int
+    online_paid_amount: float
+    online_paid_count: int
+
+
+class AdminCourierCollectionOut(BaseModel):
+    courier_user_id: int
+    courier_name: str
+    collection_count: int
+    total_amount_minor: int
+    total_amount: float
+
+
+class AdminPaymentRecordOut(BaseModel):
+    payment_id: int
+    parcel_id: int
+    tracking_number: str
+
+    payment_method: PaymentMethod
+    payment_status: PaymentStatus
+
+    amount: float
+    currency: str = "THB"
+
+    collected_by_user_id: Optional[int] = None
+    collected_by_name: Optional[str] = None
+
+    paid_at: Optional[datetime] = None
+    created_at: datetime
+
+
+class AdminPaymentReportOut(BaseModel):
+    summary: AdminPaymentSummaryOut
+    courier_collections: List[AdminCourierCollectionOut]
+    payments: List[AdminPaymentRecordOut]

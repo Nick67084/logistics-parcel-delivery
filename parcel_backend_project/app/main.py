@@ -5,7 +5,17 @@ from slowapi.errors import RateLimitExceeded
 
 from app.config import settings
 from app.limiter import limiter
-from app.routers import auth, users, parcels, couriers, hubs, tracking, geocode, payments
+from app.routers import (
+    auth,
+    users,
+    parcels,
+    couriers,
+    hubs,
+    tracking,
+    geocode,
+    payments,
+    stripe_webhooks,
+)
 
 # Database tables are managed by Alembic migrations (see /alembic).
 # Run `alembic upgrade head` after pulling schema changes.
@@ -37,6 +47,7 @@ app.include_router(parcels.router)
 app.include_router(tracking.router)
 app.include_router(geocode.router)
 app.include_router(payments.router)
+app.include_router(stripe_webhooks.router)
 
 
 @app.get("/")

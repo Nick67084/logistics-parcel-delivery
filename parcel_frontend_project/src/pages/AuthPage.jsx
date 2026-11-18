@@ -1,35 +1,50 @@
+
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import {
+  Link,
+  useNavigate,
+  useSearchParams,
+  useLocation,
+} from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { api } from "../api/client";
-import deliveryScooter from "../assets/delivery-scooter.png"; // Kept your original import!
+import deliveryScooter from "../assets/delivery-scooter.png";
+
+const HOME_BY_ROLE = {
+  customer: "/customer",
+  courier: "/courier",
+  hub_staff: "/hub",
+  admin: "/admin",
+};
 
 export default function AuthPage() {
-  const [mode, setMode] = useState("login");
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { login } = useAuth();
 
+  const requestedMode =
+    searchParams.get("mode") === "register" ? "register" : "login";
+
+  const [mode, setMode] = useState(requestedMode);
   const [form, setForm] = useState({
     name: "",
     email: "",
     password: "",
     phone: "",
   });
-
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const { login } = useAuth();
-  const navigate = useNavigate();
-
   const update = (key) => (e) => {
-    setForm((f) => ({
-      ...f,
+    setForm((current) => ({
+      ...current,
       [key]: e.target.value,
     }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     setError("");
     setBusy(true);
 
@@ -43,102 +58,112 @@ export default function AuthPage() {
 
       await login(form.email, form.password);
 
-      navigate("/");
+      // The dashboard redirect checks the authenticated role.
+      // Preserve the requested booking destination for customers.
+      const destination = location.state?.from;
+
+      if (destination === "/book") {
+        // PrivateRoute protects this page if authentication fails.
+        navigate("/book", { replace: true });
+      } else {
+        navigate("/dashboard", { replace: true });
+      }
     } catch (err) {
-      setError(err.message);
+      setError(err.message || "Authentication failed.");
     } finally {
       setBusy(false);
     }
   };
 
   const switchMode = () => {
-    setMode((current) => (current === "login" ? "register" : "login"));
+    setMode((current) =>
+      current === "login" ? "register" : "login"
+    );
     setError("");
   };
 
   return (
     <div className="auth-page">
-      {/* =================================================
-          LEFT BRAND PANEL
-          ================================================= */}
+      {/* LEFT BRAND PANEL */}
       <section className="auth-brand-panel">
-        
-        {/* SWIFTDROP BRAND */}
         <div className="auth-brand">
           <div className="auth-brand-mark">S</div>
           <div className="auth-brand-text">
             <div className="auth-brand-name">SwiftDrop</div>
-            <div className="auth-brand-label">LOGISTICS PLATFORM</div>
+            <div className="auth-brand-label">
+              LOGISTICS PLATFORM
+            </div>
           </div>
         </div>
 
-        {/* =================================================
-            PREMIUM PARALLAX ANIMATION STAGE
-            ================================================= */}
+        {/* Original animated scooter scene */}
         <div className="swift-hero">
-          {/* Background glow */}
-          <div className="swift-glow swift-glow-orange"></div>
-          <div className="swift-glow swift-glow-blue"></div>
+          <div className="swift-glow swift-glow-orange" />
+          <div className="swift-glow swift-glow-blue" />
 
-          {/* 1. SKY: CLOUDS & BIRDS (Moves very slow) */}
           <div className="parallax-layer cloud-layer">
-            <div className="cloud cloud-1"></div>
-            <div className="cloud cloud-2"></div>
-            <div className="cloud cloud-3"></div>
+            <div className="cloud cloud-1" />
+            <div className="cloud cloud-2" />
+            <div className="cloud cloud-3" />
             <div className="birds">
-              <span className="bird"></span>
-              <span className="bird"></span>
+              <span className="bird" />
+              <span className="bird" />
             </div>
           </div>
 
-          {/* 2. BACKGROUND: CITY PARALLAX (Moves slow) */}
           <div className="parallax-layer city-layer">
             <div className="city-block">
-              <span className="building b-1"></span>
-              <span className="building b-2"></span>
-              <span className="building b-3"></span>
-              <span className="building b-4"></span>
-              <span className="building b-5"></span>
-              <span className="building b-6"></span>
+              <span className="building b-1" />
+              <span className="building b-2" />
+              <span className="building b-3" />
+              <span className="building b-4" />
+              <span className="building b-5" />
+              <span className="building b-6" />
             </div>
-            {/* Duplicate for infinite loop */}
             <div className="city-block">
-              <span className="building b-1"></span>
-              <span className="building b-2"></span>
-              <span className="building b-3"></span>
-              <span className="building b-4"></span>
-              <span className="building b-5"></span>
-              <span className="building b-6"></span>
+              <span className="building b-1" />
+              <span className="building b-2" />
+              <span className="building b-3" />
+              <span className="building b-4" />
+              <span className="building b-5" />
+              <span className="building b-6" />
             </div>
           </div>
 
-          {/* 3. FOREGROUND: TREES PARALLAX (Moves medium) */}
           <div className="parallax-layer tree-layer">
             <div className="tree-block">
-              <div className="tree t-1"><div className="tree-top"></div></div>
-              <div className="tree t-2"><div className="tree-top"></div></div>
-              <div className="tree t-3"><div className="tree-top"></div></div>
+              <div className="tree t-1">
+                <div className="tree-top" />
+              </div>
+              <div className="tree t-2">
+                <div className="tree-top" />
+              </div>
+              <div className="tree t-3">
+                <div className="tree-top" />
+              </div>
             </div>
-            {/* Duplicate for infinite loop */}
             <div className="tree-block">
-              <div className="tree t-1"><div className="tree-top"></div></div>
-              <div className="tree t-2"><div className="tree-top"></div></div>
-              <div className="tree t-3"><div className="tree-top"></div></div>
+              <div className="tree t-1">
+                <div className="tree-top" />
+              </div>
+              <div className="tree t-2">
+                <div className="tree-top" />
+              </div>
+              <div className="tree t-3">
+                <div className="tree-top" />
+              </div>
             </div>
           </div>
 
-          {/* 4. GROUND & ROAD (Moves fast) */}
           <div className="swift-ground">
-            <div className="road-stripes"></div>
+            <div className="road-stripes" />
           </div>
 
-          {/* WIND SPEED LINES */}
           <div className="swift-speed-lines">
-            <span className="speed-line-one"></span>
-            <span className="speed-line-two"></span>
+            <span className="speed-line-one" />
+            <span className="speed-line-two" />
           </div>
 
-          {/* 5. SCOOTER (Bobs up and down, perfectly on the road) */}
           <div className="swift-scooter-track">
             <img
               src={deliveryScooter}
@@ -147,32 +172,26 @@ export default function AuthPage() {
             />
           </div>
 
-          {/* DELIVERY ROUTE */}
           <div className="swift-route">
-            <span className="swift-route-start"></span>
-            <span className="swift-route-dashes"></span>
+            <span className="swift-route-start" />
+            <span className="swift-route-dashes" />
             <span className="swift-route-end">→</span>
           </div>
         </div>
 
-        {/* LIVE STATUS */}
         <div className="swift-live-status">
-          <span className="swift-live-dot"></span>
+          <span className="swift-live-dot" />
           <span>Fast. Reliable. Always moving.</span>
         </div>
 
-        {/* FOOTER */}
         <div className="auth-brand-footer">
           CSC480 · SwiftDrop Logistics Platform
         </div>
       </section>
 
-      {/* =================================================
-          RIGHT AUTH PANEL
-          ================================================= */}
+      {/* RIGHT AUTH PANEL */}
       <section className="auth-form-panel">
         <div className="auth-form-container">
-          
           <div className="auth-mobile-brand">
             <div className="auth-brand-mark">S</div>
             <div className="auth-brand-name">SwiftDrop</div>
@@ -180,11 +199,17 @@ export default function AuthPage() {
 
           <div className="auth-heading">
             <div className="auth-form-eyebrow">
-              {mode === "login" ? "ACCOUNT LOGIN" : "CREATE ACCOUNT"}
+              {mode === "login"
+                ? "ACCOUNT LOGIN"
+                : "CREATE ACCOUNT"}
             </div>
+
             <h2>
-              {mode === "login" ? "Welcome back" : "Create your account"}
+              {mode === "login"
+                ? "Welcome back"
+                : "Create your account"}
             </h2>
+
             <p>
               {mode === "login"
                 ? "Sign in to continue to your delivery dashboard."
@@ -243,9 +268,12 @@ export default function AuthPage() {
               <div className="auth-label-row">
                 <label htmlFor="password">Password</label>
                 {mode === "login" && (
-                  <span className="auth-helper">Secure login</span>
+                  <span className="auth-helper">
+                    Secure login
+                  </span>
                 )}
               </div>
+
               <input
                 id="password"
                 type="password"
@@ -254,22 +282,35 @@ export default function AuthPage() {
                 placeholder="Enter your password"
                 required
               />
+
               {mode === "register" && (
                 <small
-                  style={{ display: "block", marginTop: 6, opacity: 0.7 }}
+                  style={{
+                    display: "block",
+                    marginTop: 6,
+                    opacity: 0.7,
+                  }}
                 >
-                  At least 8 characters, with at least one letter and one number.
+                  At least 8 characters, with at least one
+                  letter and one number.
                 </small>
               )}
             </div>
 
-            <button type="submit" className="auth-submit" disabled={busy}>
+            <button
+              type="submit"
+              className="auth-submit"
+              disabled={busy}
+            >
               {busy
                 ? "Please wait..."
                 : mode === "login"
                 ? "Sign in"
                 : "Create account"}
-              {!busy && <span className="auth-submit-arrow">→</span>}
+
+              {!busy && (
+                <span className="auth-submit-arrow">→</span>
+              )}
             </button>
           </form>
 
@@ -280,18 +321,29 @@ export default function AuthPage() {
                 : "Already have an account?"}
             </span>
             <button type="button" onClick={switchMode}>
-              {mode === "login" ? "Create account" : "Sign in"}
+              {mode === "login"
+                ? "Create account"
+                : "Sign in"}
             </button>
           </div>
 
-          {/* Public tracking: no login needed */}
-          <p style={{ textAlign: "center", marginTop: 14, fontSize: 14 }}>
-            <Link to="/track">Track a parcel without signing in</Link>
+          <p
+            style={{
+              textAlign: "center",
+              marginTop: 14,
+              fontSize: 14,
+            }}
+          >
+            <Link to="/track">
+              Track a parcel without signing in
+            </Link>
           </p>
 
           <div className="auth-security">
             <span className="auth-security-icon">✓</span>
-            <span>Your session is protected by secure authentication.</span>
+            <span>
+              Your session is protected by secure authentication.
+            </span>
           </div>
         </div>
       </section>

@@ -670,6 +670,20 @@ class Payment(Base):
         unique=True,
     )
 
+        # Stripe Checkout session associated with this payment.
+    stripe_checkout_session_id = Column(
+        String(255),
+        nullable=True,
+        unique=True,
+    )
+
+    # Stripe PaymentIntent that represents the payment.
+    stripe_payment_intent_id = Column(
+        String(255),
+        nullable=True,
+        unique=True,
+    )
+
     expires_at = Column(
         DateTime,
         nullable=True,

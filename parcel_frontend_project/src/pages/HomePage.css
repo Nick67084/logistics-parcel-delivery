@@ -1,0 +1,443 @@
+
+/* =========================================
+   SWIFTDROP HOMEPAGE
+   Styles isolated from AuthPage.jsx
+   ========================================= */
+
+.swift-home {
+  min-height: 100vh;
+  background: #f4f9fc;
+  font-family: inherit;
+}
+
+/* =========================================
+   HERO SECTION
+   ========================================= */
+
+.sd-home-hero {
+  min-height: 100vh;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  color: white;
+
+  background: linear-gradient(
+    115deg,
+    #053858,
+    #087ba4
+  );
+}
+
+/* Bangkok background image */
+.sd-home-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+
+  background-image: url("/images/swiftdrop.png");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+
+  opacity: 1;
+  pointer-events: none;
+}
+
+/* No extra overlay: image already has blue effects */
+.sd-home-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: transparent;
+  pointer-events: none;
+}
+
+/* =========================================
+   NAVIGATION
+   ========================================= */
+
+.swift-navbar,
+.swift-hero-content {
+  position: relative;
+  z-index: 2;
+}
+
+.swift-navbar {
+  max-width: 1500px;
+  margin: 0 auto;
+  padding: 30px 5%;
+
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+}
+
+.swift-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.swift-logo {
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+
+  display: grid;
+  place-items: center;
+
+  border-radius: 16px;
+  background: #ff791e;
+
+  color: white;
+  font-size: 35px;
+  font-weight: 900;
+}
+
+.swift-brand strong {
+  display: block;
+  color: white;
+  font-size: 32px;
+  letter-spacing: -1px;
+  line-height: 1.15;
+}
+
+.swift-brand small {
+  display: block;
+  margin-top: 5px;
+  color: white;
+  font-size: 11px;
+  letter-spacing: 3px;
+  font-weight: 700;
+}
+
+/* =========================================
+   LOGIN AND REGISTER BUTTONS
+   ========================================= */
+
+.swift-auth-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.swift-auth-actions button {
+  border-radius: 12px;
+  padding: 14px 25px;
+
+  color: white;
+  font-size: 15px;
+  font-weight: 700;
+
+  cursor: pointer;
+  transition:
+    transform 0.25s ease,
+    background 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+.swift-auth-actions button:hover {
+  transform: translateY(-3px);
+}
+
+.swift-login {
+  background: transparent;
+  border: 1.5px solid white;
+}
+
+.swift-login:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.swift-register {
+  background: #ff791e;
+  border: 1.5px solid #ff791e;
+}
+
+.swift-register:hover {
+  background: #ff8b35;
+  box-shadow: 0 8px 25px rgba(255, 121, 30, 0.3);
+}
+
+/* =========================================
+   HERO CONTENT
+   ========================================= */
+
+.swift-hero-content {
+  max-width: 1500px;
+  margin: 0 auto;
+  padding: 110px 5% 130px;
+}
+
+.swift-eyebrow {
+  margin: 0;
+  color: white;
+  letter-spacing: 4px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.sd-home-hero h1 {
+  margin: 30px 0 20px;
+
+  color: white;
+  font-size: clamp(38px, 4.3vw, 72px);
+  font-weight: 850;
+  line-height: 1.12;
+  letter-spacing: -2px;
+
+  max-width: 850px;
+}
+
+.sd-home-hero h1 em {
+  color: #ff791e;
+  font-style: italic;
+}
+
+.swift-description {
+  max-width: 540px;
+  color: #e0edf6;
+  font-size: 20px;
+  line-height: 1.6;
+}
+
+/* =========================================
+   MAIN ACTION CARDS
+   ========================================= */
+
+.swift-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin-top: 50px;
+}
+
+.swift-actions button {
+  width: 245px;
+  min-height: 105px;
+  padding: 22px;
+
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 20px;
+
+  background: rgba(255, 255, 255, 0.96);
+  color: #102a43;
+
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+
+  text-align: left;
+  font-size: 17px;
+  cursor: pointer;
+
+  box-shadow: 0 15px 35px rgba(0, 20, 40, 0.15);
+
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease,
+    border-color 0.25s ease;
+}
+
+.swift-actions button strong {
+  flex: 1;
+  font-weight: 800;
+}
+
+.swift-actions button:hover {
+  transform: translateY(-7px);
+  border-color: #ff791e;
+  box-shadow: 0 20px 40px rgba(0, 20, 40, 0.25);
+}
+
+.swift-actions button span {
+  color: #ff791e;
+  font-size: 27px;
+}
+
+/* =========================================
+   ABOUT US SECTION
+   ========================================= */
+
+.swift-about {
+  padding: 100px 8%;
+  text-align: center;
+  scroll-margin-top: 20px;
+  background: #f4f9fc;
+}
+
+.swift-about span {
+  color: #f97316;
+  font-weight: 800;
+  letter-spacing: 3px;
+}
+
+.swift-about h2 {
+  margin-top: 18px;
+  color: #0b4167;
+  font-size: clamp(28px, 3vw, 44px);
+}
+
+.swift-about p {
+  max-width: 720px;
+  margin: 20px auto;
+
+  color: #52677a;
+  line-height: 1.8;
+  font-size: 17px;
+}
+
+/* =========================================
+   TABLET RESPONSIVE
+   ========================================= */
+
+@media (max-width: 1024px) {
+  .swift-navbar {
+    padding: 25px 4%;
+  }
+
+  .swift-hero-content {
+    padding: 90px 4% 110px;
+  }
+
+  .sd-home-hero h1 {
+    font-size: clamp(36px, 5vw, 58px);
+    max-width: 700px;
+  }
+
+  .swift-actions button {
+    width: 220px;
+  }
+
+  .sd-home-hero::before {
+    background-position: 60% center;
+  }
+}
+
+/* =========================================
+   MOBILE RESPONSIVE
+   ========================================= */
+
+@media (max-width: 768px) {
+  .sd-home-hero {
+    min-height: 100vh;
+  }
+
+  .swift-navbar {
+    padding: 22px;
+    flex-wrap: wrap;
+    gap: 18px;
+  }
+
+  .swift-brand strong {
+    font-size: 24px;
+  }
+
+  .swift-brand small {
+    font-size: 9px;
+    letter-spacing: 2px;
+  }
+
+  .swift-logo {
+    width: 48px;
+    height: 48px;
+    font-size: 27px;
+    border-radius: 12px;
+  }
+
+  .swift-auth-actions {
+    gap: 10px;
+  }
+
+  .swift-auth-actions button {
+    padding: 10px 14px;
+    font-size: 13px;
+  }
+
+  .swift-hero-content {
+    padding: 75px 22px 100px;
+  }
+
+  .swift-eyebrow {
+    font-size: 12px;
+    letter-spacing: 2px;
+  }
+
+  .sd-home-hero h1 {
+    font-size: clamp(34px, 8vw, 48px);
+    letter-spacing: -1px;
+    line-height: 1.15;
+  }
+
+  .swift-description {
+    font-size: 16px;
+    max-width: 420px;
+  }
+
+  .swift-actions {
+    margin-top: 35px;
+    gap: 14px;
+  }
+
+  .swift-actions button {
+    width: 100%;
+    max-width: 420px;
+    min-height: 75px;
+    padding: 18px;
+  }
+
+  .sd-home-hero::before {
+    background-position: 65% center;
+  }
+
+  /* Mobile-only contrast for readable text */
+  .sd-home-hero::after {
+    background: linear-gradient(
+      90deg,
+      rgba(3, 49, 78, 0.65),
+      rgba(3, 49, 78, 0.2)
+    );
+  }
+
+  .swift-about {
+    padding: 70px 22px;
+  }
+
+  .swift-about p {
+    font-size: 15px;
+  }
+}
+
+/* =========================================
+   SMALL MOBILE
+   ========================================= */
+
+@media (max-width: 480px) {
+  .swift-navbar {
+    align-items: flex-start;
+  }
+
+  .swift-auth-actions {
+    width: 100%;
+  }
+
+  .swift-auth-actions button {
+    flex: 1;
+  }
+
+  .swift-hero-content {
+    padding-top: 55px;
+  }
+
+  .sd-home-hero h1 {
+    font-size: 34px;
+  }
+
+  .swift-actions button {
+    min-height: 70px;
+  }
+}

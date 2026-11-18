@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import Layout from "../components/Layout";
@@ -8,13 +8,13 @@ const ONLINE_METHODS = [
   {
     value: "promptpay",
     title: "PromptPay / QR",
-    description: "Use the demo QR payment screen.",
+    description: "Continue to secure Stripe Checkout for PromptPay.",
     icon: "▦",
   },
   {
     value: "card",
     title: "Credit / Debit Card",
-    description: "Use a simulated card payment.",
+    description: "Continue to secure Stripe Checkout for card payment.",
     icon: "▣",
   },
 ];
@@ -69,80 +69,6 @@ function formatCountdown(milliseconds) {
   return [hours, minutes, seconds]
     .map((value) => String(value).padStart(2, "0"))
     .join(":");
-}
-
-function FakeQrCode({ value }) {
-  const cells = useMemo(() => {
-    const size = 21;
-    const result = [];
-
-    let seed = 0;
-    for (const char of value) {
-      seed = (seed * 31 + char.charCodeAt(0)) >>> 0;
-    }
-
-    const finder = (row, col, top, left) => {
-      const r = row - top;
-      const c = col - left;
-
-      if (r < 0 || r > 6 || c < 0 || c > 6) return null;
-
-      return (
-        r === 0 ||
-        r === 6 ||
-        c === 0 ||
-        c === 6 ||
-        (r >= 2 && r <= 4 && c >= 2 && c <= 4)
-      );
-    };
-
-    for (let row = 0; row < size; row += 1) {
-      for (let col = 0; col < size; col += 1) {
-        let dark = null;
-
-        dark = finder(row, col, 0, 0);
-        if (dark === null) dark = finder(row, col, 0, 14);
-        if (dark === null) dark = finder(row, col, 14, 0);
-
-        if (dark === null) {
-          const index = row * size + col;
-          const mixed =
-            (seed ^ Math.imul(index + 17, 2654435761)) >>> 0;
-          dark = mixed % 7 < 3;
-        }
-
-        result.push(dark);
-      }
-    }
-
-    return result;
-  }, [value]);
-
-  return (
-    <div
-      aria-label="Demo payment QR code"
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(21, 1fr)",
-        width: 210,
-        height: 210,
-        padding: 12,
-        background: "#ffffff",
-        border: "1px solid #d9dee8",
-        borderRadius: 16,
-        boxShadow: "0 12px 30px rgba(15, 23, 42, 0.10)",
-      }}
-    >
-      {cells.map((dark, index) => (
-        <span
-          key={index}
-          style={{
-            background: dark ? "#111827" : "#ffffff",
-          }}
-        />
-      ))}
-    </div>
-  );
 }
 
 function PaymentReceipt({ parcel, payment }) {
@@ -270,11 +196,11 @@ export default function PaymentPage() {
 
   const [parcel, setParcel] = useState(null);
   const [payment, setPayment] = useState(null);
-  const [selectedMethod, setSelectedMethod] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [now, setNow] = useState(Date.now());
+  const [checkoutStarted, setCheckoutStarted] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -291,7 +217,6 @@ export default function PaymentPage() {
         setPayment(null);
       }
 
-      setError("");
     } catch (e) {
       setError(e.message);
     } finally {
@@ -300,6 +225,7 @@ export default function PaymentPage() {
   }, [parcelId]);
 
   useEffect(() => {
+    setCheckoutStarted(false);
     load();
   }, [load]);
 
@@ -328,7 +254,7 @@ export default function PaymentPage() {
     try {
       const data = await api.startPayment(parcelId, method);
       setPayment(data);
-      setSelectedMethod(method);
+
     } catch (e) {
       setError(e.message);
       await load();
@@ -352,19 +278,23 @@ export default function PaymentPage() {
     }
   };
 
-  const completeOnlinePayment = async () => {
+  const openStripeCheckout = async () => {
+    if (busy || checkoutStarted) return;
     setBusy(true);
     setError("");
-
     try {
-      const data = await api.completeOnlinePayment(parcelId);
-      setPayment(data);
-      await load();
+      const result = await api.createStripeCheckout(parcelId);
+      const checkoutUrl = result?.checkout_url;
+      if (!checkoutUrl || !checkoutUrl.startsWith("https://checkout.stripe.com/")) {
+        throw new Error("The server did not return a valid Stripe Checkout URL.");
+      }
+      setCheckoutStarted(true);
+      window.location.assign(checkoutUrl);
     } catch (e) {
-      setError(e.message);
-      await load();
-    } finally {
+      setError(e.message || "Could not open Stripe Checkout.");
       setBusy(false);
+      // A 409 can mean a Checkout Session already exists. Do not create
+      // another session automatically; backend session recovery is needed.
     }
   };
 
@@ -439,7 +369,7 @@ const expired =
 
             <h2 style={{ marginBottom: 8 }}>Choose payment method</h2>
             <p style={{ color: "#64748b", marginTop: 0 }}>
-              Online payment must be completed within one hour of booking.
+              Online payment must be completed within the booking payment window.
               Cash on delivery is paid to the courier at delivery.
             </p>
 
@@ -546,7 +476,8 @@ const expired =
           </section>
         )}
 
-        {payment && !paid && !codUnpaid && !expired && payment.payment_method === "promptpay" && (
+        {payment && !paid && !codUnpaid && !expired &&
+          ["card", "promptpay"].includes(payment.payment_method) && (
           <section
             style={{
               maxWidth: 760,
@@ -560,69 +491,42 @@ const expired =
             }}
           >
             <div style={{ color: "#64748b", fontSize: 12, fontWeight: 800, letterSpacing: "0.14em" }}>
-              DEMO PROMPTPAY
+              SECURE STRIPE CHECKOUT
             </div>
-            <h2 style={{ margin: "8px 0" }}>Scan the demo QR</h2>
+            <h2 style={{ margin: "8px 0" }}>
+              {payment.payment_method === "promptpay" ? "Pay with PromptPay" : "Pay by card"}
+            </h2>
             <p style={{ color: "#64748b" }}>
-              This QR is simulated for the university demonstration. No real money is transferred.
+              Stripe securely handles payment information. Available payment methods
+              are controlled by your Stripe Sandbox settings.
             </p>
-
-            <div style={{ display: "flex", justifyContent: "center", margin: "24px 0" }}>
-              <FakeQrCode value={`${parcel.tracking_number}-${payment.amount}`} />
-            </div>
-
-            <div style={{ fontSize: 30, fontWeight: 800, marginBottom: 6 }}>
+            <div style={{ fontSize: 30, fontWeight: 800, margin: "22px 0 8px" }}>
               ฿{formatMoney(payment.amount)}
             </div>
-
-            <div style={{ color: "#64748b", marginBottom: 20 }}>
-              Time remaining: <strong>{formatCountdown(remaining)}</strong>
-            </div>
-
-            <button className="btn btn-primary" type="button" disabled={busy} onClick={completeOnlinePayment}>
-              {busy ? "Processing..." : "I've Completed Payment"}
-            </button>
-          </section>
-        )}
-
-        {payment && !paid && !codUnpaid && !expired && payment.payment_method === "card" && (
-          <section
-            style={{
-              maxWidth: 760,
-              margin: "0 auto",
-              background: "#ffffff",
-              border: "1px solid #e5e7eb",
-              borderRadius: 24,
-              padding: 32,
-              boxShadow: "0 18px 50px rgba(15, 23, 42, 0.07)",
-            }}
-          >
-            <div style={{ color: "#64748b", fontSize: 12, fontWeight: 800, letterSpacing: "0.14em" }}>
-              DEMO CARD PAYMENT
-            </div>
-            <h2 style={{ margin: "8px 0" }}>Secure test checkout</h2>
             <p style={{ color: "#64748b" }}>
-              This is a simulated card payment for the university demonstration. No real card data is processed.
-            </p>
-
-            <div style={{ display: "grid", gap: 14, maxWidth: 500, margin: "24px auto" }}>
-              <input placeholder="Cardholder name" />
-              <input placeholder="Test card number" value="4242 4242 4242 4242" readOnly />
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                <input placeholder="MM / YY" value="12 / 30" readOnly />
-                <input placeholder="CVC" value="123" readOnly />
-              </div>
-            </div>
-
-            <div style={{ textAlign: "center", color: "#64748b", marginBottom: 20 }}>
               Time remaining: <strong>{formatCountdown(remaining)}</strong>
-            </div>
-
-            <div style={{ textAlign: "center" }}>
-              <button className="btn btn-primary" type="button" disabled={busy} onClick={completeOnlinePayment}>
-                {busy ? "Processing..." : `Pay ฿${formatMoney(payment.amount)}`}
-              </button>
-            </div>
+            </p>
+            <button
+              className="btn btn-primary"
+              type="button"
+              disabled={busy || checkoutStarted || remaining < 30 * 60 * 1000}
+              onClick={openStripeCheckout}
+            >
+              {busy || checkoutStarted ? "Opening Stripe..." : "Continue to Stripe Checkout"}
+            </button>
+            {remaining < 30 * 60 * 1000 && (
+              <p style={{ color: "#b45309", marginTop: 14 }}>
+                Stripe requires at least 30 minutes before session expiry.
+                Please create a new booking if no Checkout Session was created earlier.
+              </p>
+            )}
+            <p style={{ color: "#64748b", fontSize: 13, marginTop: 18 }}>
+              After returning from Stripe, this page checks the backend payment status.
+              A receipt appears only when the payment is recorded as paid.
+            </p>
+            <button className="btn btn-secondary" type="button" disabled={busy} onClick={load}>
+              Refresh payment status
+            </button>
           </section>
         )}
 

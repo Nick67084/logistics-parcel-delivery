@@ -1,4 +1,7 @@
-const BASE_URL = (import.meta.env.VITE_API_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
+
+const BASE_URL = (
+  import.meta.env.VITE_API_URL || "http://127.0.0.1:8000"
+).replace(/\/$/, "");
 
 function getToken() {
   return localStorage.getItem("token");
@@ -9,10 +12,17 @@ async function request(
   { method = "GET", body, auth = true, form = false } = {},
 ) {
   const headers = {};
-  if (!form) headers["Content-Type"] = "application/json";
+
+  if (!form) {
+    headers["Content-Type"] = "application/json";
+  }
+
   if (auth) {
     const token = getToken();
-    if (token) headers["Authorization"] = `Bearer ${token}`;
+
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
   }
 
   const res = await fetch(`${BASE_URL}${path}`, {
@@ -22,31 +32,47 @@ async function request(
   });
 
   let data = null;
+
   try {
     data = await res.json();
   } catch (_) {
-    // no JSON body
+    // No JSON body
   }
 
   if (!res.ok) {
-    const message = data?.detail || res.statusText || "Request failed";
+    const message =
+      data?.detail || res.statusText || "Request failed";
+
     throw new Error(
-      typeof message === "string" ? message : JSON.stringify(message),
+      typeof message === "string"
+        ? message
+        : JSON.stringify(message),
     );
   }
+
   return data;
 }
 
 export const api = {
   BASE_URL,
 
+  // ----------------------------------------
+  // AUTHENTICATION
+  // ----------------------------------------
+
   register: (payload) =>
-    request("/auth/register", { method: "POST", body: payload, auth: false }),
+    request("/auth/register", {
+      method: "POST",
+      body: payload,
+      auth: false,
+    }),
 
   login: (email, password) => {
     const form = new URLSearchParams();
+
     form.append("username", email);
     form.append("password", password);
+
     return request("/auth/login", {
       method: "POST",
       body: form,
@@ -57,23 +83,66 @@ export const api = {
 
   me: () => request("/users/me"),
 
-  listHubs: () => request("/hubs/", { auth: false }),
-  createHub: (payload) => request("/hubs/", { method: "POST", body: payload }),
+  // ----------------------------------------
+  // HUBS
+  // ----------------------------------------
+
+  listHubs: () =>
+    request("/hubs/", { auth: false }),
+
+  createHub: (payload) =>
+    request("/hubs/", {
+      method: "POST",
+      body: payload,
+    }),
+
+  // ----------------------------------------
+  // PARCELS
+  // ----------------------------------------
 
   bookParcel: (payload) =>
-    request("/parcels/", { method: "POST", body: payload }),
+    request("/parcels/", {
+      method: "POST",
+      body: payload,
+    }),
+
   myParcels: () => request("/parcels/"),
-  getParcel: (id) => request(`/parcels/${id}`),
+
+  getParcel: (id) =>
+    request(`/parcels/${id}`),
+
   trackParcel: (trackingNumber) =>
-    request(`/parcels/track/${trackingNumber}`, { auth: false }),
+    request(`/parcels/track/${trackingNumber}`, {
+      auth: false,
+    }),
+
   updateParcelStatus: (id, payload) =>
-    request(`/parcels/${id}/status`, { method: "PATCH", body: payload }),
+    request(`/parcels/${id}/status`, {
+      method: "PATCH",
+      body: payload,
+    }),
+
   cancelParcel: (id, reason) =>
-    request(`/parcels/${id}/cancel`, { method: "POST", body: { reason } }),
+    request(`/parcels/${id}/cancel`, {
+      method: "POST",
+      body: { reason },
+    }),
+
   rescheduleParcel: (id, payload) =>
-    request(`/parcels/${id}/reschedule`, { method: "PATCH", body: payload }),
+    request(`/parcels/${id}/reschedule`, {
+      method: "PATCH",
+      body: payload,
+    }),
+
   hubTransfer: (payload) =>
-    request("/parcels/hub-transfer", { method: "POST", body: payload }),
+    request("/parcels/hub-transfer", {
+      method: "POST",
+      body: payload,
+    }),
+
+  // ----------------------------------------
+  // PAYMENTS
+  // ----------------------------------------
 
   getPayment: (parcelId) =>
     request(`/payments/${parcelId}`),
@@ -81,22 +150,47 @@ export const api = {
   startPayment: (parcelId, paymentMethod) =>
     request(`/payments/${parcelId}/start`, {
       method: "POST",
-      body: { payment_method: paymentMethod },
+      body: {
+        payment_method: paymentMethod,
+      },
     }),
 
-  completeOnlinePayment: (parcelId) =>
-    request(`/payments/${parcelId}/complete`, {
+  // Create Stripe Checkout Session
+  createStripeCheckout: (parcelId) =>
+    request(`/payments/${parcelId}/checkout`, {
       method: "POST",
     }),
 
+  // Confirm Cash on Delivery collection
   collectCashPayment: (parcelId) =>
     request(`/payments/${parcelId}/collect-cash`, {
       method: "POST",
     }),
 
-  courierMe: () => request("/couriers/me"),
+  // NEW: Get today's COD cash collection
+  // for the currently logged-in courier.
+  courierTodayCollection: () =>
+    request("/payments/courier/today-collection"),
 
-  courierJobs: () => request("/couriers/jobs"),
+  // Admin Payment Management Report
+adminPaymentReport: (reportDate) =>
+  request(
+    `/payments/admin/report${
+      reportDate
+        ? `?report_date=${encodeURIComponent(reportDate)}`
+        : ""
+    }`
+  ),
+
+  // ----------------------------------------
+  // COURIERS
+  // ----------------------------------------
+
+  courierMe: () =>
+    request("/couriers/me"),
+
+  courierJobs: () =>
+    request("/couriers/jobs"),
 
   acceptCourierJob: (parcelId) =>
     request(`/couriers/jobs/${parcelId}/accept`, {
@@ -115,17 +209,48 @@ export const api = {
       body: { latitude, longitude },
     }),
 
-  listUsers: () => request("/users/"),
+  // ----------------------------------------
+  // USERS / STAFF
+  // ----------------------------------------
+
+  listUsers: () =>
+    request("/users/"),
+
   createStaff: (payload) =>
-    request("/auth/staff", { method: "POST", body: payload }),
+    request("/auth/staff", {
+      method: "POST",
+      body: payload,
+    }),
+
   updateMyAddress: (payload) =>
-    request("/users/me/address", { method: "PATCH", body: payload }),
+    request("/users/me/address", {
+      method: "PATCH",
+      body: payload,
+    }),
+
+  // ----------------------------------------
+  // GEOCODING
+  // ----------------------------------------
 
   geocodeSearch: (query) =>
-    request(`/geocode/search?q=${encodeURIComponent(query)}`, { auth: false }),
+    request(
+      `/geocode/search?q=${encodeURIComponent(query)}`,
+      { auth: false },
+    ),
+
   geocodeReverse: (lat, lng) =>
-    request(`/geocode/reverse?lat=${lat}&lng=${lng}`, { auth: false }),
+    request(
+      `/geocode/reverse?lat=${lat}&lng=${lng}`,
+      { auth: false },
+    ),
 };
+
+
+
+// ----------------------------------------
+// WEBSOCKET
+// ----------------------------------------
+
 export function wsUrl(parcelId) {
   const token = getToken();
 
