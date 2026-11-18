@@ -23,12 +23,30 @@ function formatMoney(value) {
   return Number(value || 0).toFixed(2);
 }
 
+
+function parseUtcDate(value) {
+  if (!value) return null;
+
+  const normalized = String(value).trim();
+
+  const hasTimezone =
+    /(?:Z|[+-]\d{2}:?\d{2})$/i.test(normalized);
+
+  const date = new Date(
+    hasTimezone ? normalized : `${normalized}Z`
+  );
+
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+
+
 function formatDateTime(value) {
   if (!value) return "—";
 
-  const date = new Date(value);
+  const date = parseUtcDate(value);
 
-  if (Number.isNaN(date.getTime())) return value;
+  if (!date) return value;
 
   return date.toLocaleString(undefined, {
     year: "numeric",
@@ -38,6 +56,7 @@ function formatDateTime(value) {
     minute: "2-digit",
   });
 }
+
 
 function formatCountdown(milliseconds) {
   if (milliseconds <= 0) return "00:00:00";
@@ -359,9 +378,26 @@ export default function PaymentPage() {
     );
   }
 
-  const deadline = payment?.expires_at ? new Date(payment.expires_at).getTime() : null;
-  const remaining = deadline ? deadline - now : 0;
-  const expired = payment?.payment_status === "expired" || (payment?.payment_status === "pending" && remaining <= 0);
+  
+const deadlineDate = parseUtcDate(payment?.expires_at);
+
+const deadline = deadlineDate
+  ? deadlineDate.getTime()
+  : null;
+
+const remaining =
+  deadline !== null
+    ? Math.max(0, deadline - now)
+    : 0;
+
+const expired =
+  payment?.payment_status === "expired" ||
+  (
+    payment?.payment_status === "pending" &&
+    deadline !== null &&
+    now >= deadline
+  );
+
   const paid = payment?.payment_status === "paid";
   const codUnpaid = payment?.payment_method === "cash_on_delivery" && payment?.payment_status === "unpaid";
 
